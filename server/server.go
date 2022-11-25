@@ -28,7 +28,8 @@ import (
 	"math/rand"
 	"net"
 	"time"
-
+	"os"
+	"bytes"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
@@ -47,6 +48,13 @@ const (
 type server struct {
 	pb.UnimplementedEchoServer
 }
+
+
+type CallInfo struct {
+	Connd_id    string 
+}
+
+var CallMap map[string]CallInfo
 
 func (s *server) UnaryEcho(ctx context.Context, in *pb.EchoRequest) (*pb.EchoResponse, error) {
 	fmt.Printf("--- UnaryEcho ---\n")
@@ -74,7 +82,7 @@ func (s *server) UnaryEcho(ctx context.Context, in *pb.EchoRequest) (*pb.EchoRes
 
 	fmt.Printf("request received: %v, sending echo\n", in)
 
-	return &pb.EchoResponse{Message: in.Message}, nil
+	return &pb.EchoResponse{Message: in.Ucidkey}, nil
 }
 
 func (s *server) ServerStreamingEcho(in *pb.EchoRequest, stream pb.Echo_ServerStreamingEchoServer) error {
@@ -105,8 +113,8 @@ func (s *server) ServerStreamingEcho(in *pb.EchoRequest, stream pb.Echo_ServerSt
 
 	// Read requests and send responses.
 	for i := 0; i < streamingCount; i++ {
-		fmt.Printf("echo message %v\n", in.Message)
-		err := stream.Send(&pb.EchoResponse{Message: in.Message})
+		fmt.Printf("echo message %v\n", in.Ucidkey)
+		err := stream.Send(&pb.EchoResponse{Message: in.Ucidkey})
 		if err != nil {
 			return err
 		}
@@ -139,19 +147,44 @@ func (s *server) ClientStreamingEcho(stream pb.Echo_ClientStreamingEchoServer) e
 	stream.SendHeader(header)
 
 	// Read requests and send responses.
-	var message string
+	//var message string
+	var path string = "/home/icatch/save/"
+
+	streamData := bytes.Buffer{}
+
 	for {
 		in, err := stream.Recv()
+		//message = in.Ucidkey
 		if err == io.EOF {
 			fmt.Printf("echo last received message\n")
-			return stream.SendAndClose(&pb.EchoResponse{Message: message})
+			//time.Sleep(20 * time.Second)
+			//fmt.Printf("key:test\n")
+			//delete(CallMap, message)
+			//
+			break;
 		}
-		message = in.Message
-		fmt.Printf("request received: %v, building echo\n", in)
+		path = "/home/icatch/save/" + in.Ucidkey + ".pcm"
+
+		_, err = streamData.Write(in.Data)
+		if err != nil {
+			fmt.Printf("streamData write error\n")
+		}
+		//saveStream("W", in.Ucidkey, in.Data)
+		i := 0
+		for ; i < 10; i++ {
+		  fmt.Println(i)
+		  time.Sleep(1 * time.Second)
+		}
+		//time.Sleep(1 * time.Second)
+		//fmt.Printf("request received: %v, building echo\n", in.Ucidkey )
 		if err != nil {
 			return err
 		}
+
 	}
+	saveFile(path, streamData)
+
+	return stream.SendAndClose(&pb.EchoResponse{Message: "1"}) 
 }
 
 func (s *server) BidirectionalStreamingEcho(stream pb.Echo_BidirectionalStreamingEchoServer) error {
@@ -189,10 +222,74 @@ func (s *server) BidirectionalStreamingEcho(stream pb.Echo_BidirectionalStreamin
 			return err
 		}
 		fmt.Printf("request received %v, sending echo\n", in)
-		if err := stream.Send(&pb.EchoResponse{Message: in.Message}); err != nil {
+		if err := stream.Send(&pb.EchoResponse{Message: "in.Ucidkey"}); err != nil {
 			return err
 		}
 	}
+
+
+
+	//return nil
+
+}
+func saveFile(path string, data bytes.Buffer){
+
+	//var path string = "/home/icatch/save/"
+	//message := key
+	//val, exist := CallMap[message]
+
+
+	//fmt.Printf("saveStream flag: %s\n", flag)
+	//fmt.Printf("saveStream key : %s\n", key)
+	//path = path + key + ".pcm"
+	/*
+	if !exist {
+		fmt.Printf("Create map\n")
+		call_info := CallInfo{
+				Connd_id: key,
+		}
+		CallMap[key] = call_info
+		
+		
+
+		fo, err2 := os.Create(path)
+		if err2 != nil {
+			panic(err2)
+		}
+		defer fo.Close()
+	
+	}else {
+		fmt.Printf("key exist: %s\n", val.Connd_id)
+	}
+	*/
+	fmt.Printf("path: %s\n", path)
+			
+	fo, err := os.Create(path)
+	if err != nil {
+		panic(err)
+	}
+	defer fo.Close()
+
+	_, err = data.WriteTo(fo)
+	if err != nil {
+		panic(err)
+	}
+
+	/*
+	fmt.Printf("write before\n")
+	fo, err := os.OpenFile(path, os.O_APPEND|os.O_WRONLY, os.ModeAppend)
+	if err != nil {
+			panic(err)
+	}
+	
+
+	_, err = fo.Write(data)
+
+	if err != nil {
+		panic(err)
+	}	
+	*/
+
 }
 
 func main() {
@@ -203,7 +300,8 @@ func main() {
 		log.Fatalf("failed to listen: %v", err)
 	}
 	fmt.Printf("server listening at %v\n", lis.Addr())
-
+	
+	CallMap = make(map[string]CallInfo)
 	s := grpc.NewServer()
 	pb.RegisterEchoServer(s, &server{})
 	s.Serve(lis)
