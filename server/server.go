@@ -30,6 +30,7 @@ import (
 	"time"
 	"os"
 	"bytes"
+	"sync"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
@@ -123,6 +124,12 @@ func (s *server) ServerStreamingEcho(in *pb.EchoRequest, stream pb.Echo_ServerSt
 }
 
 func (s *server) ClientStreamingEcho(stream pb.Echo_ClientStreamingEchoServer) error {
+
+	// WaitGroup 생성. 2개의 Go루틴을 기다림.
+	var wait sync.WaitGroup
+	wait.Add(1)
+	
+		
 	fmt.Printf("--- ClientStreamingEcho ---\n")
 	// Create trailer in defer to record function return time.
 	defer func() {
@@ -170,19 +177,39 @@ func (s *server) ClientStreamingEcho(stream pb.Echo_ClientStreamingEchoServer) e
 			fmt.Printf("streamData write error\n")
 		}
 		//saveStream("W", in.Ucidkey, in.Data)
-		i := 0
-		for ; i < 10; i++ {
-		  fmt.Println(i)
-		  time.Sleep(1 * time.Second)
-		}
+
 		//time.Sleep(1 * time.Second)
-		//fmt.Printf("request received: %v, building echo\n", in.Ucidkey )
-		if err != nil {
-			return err
-		}
+		fmt.Printf("request received: %v, building echo\n", in.Ucidkey )
 
 	}
-	saveFile(path, streamData)
+	
+	go func (path string, data bytes.Buffer) {
+
+	
+		defer wait.Done() //끝나면 .Done() 호출
+				
+		fo, err := os.Create(path)
+		if err != nil {
+			panic(err)
+		}
+		defer fo.Close()
+
+		_, err = data.WriteTo(fo)
+		if err != nil {
+			panic(err)
+		}
+	}(path, streamData)
+
+	/*
+	i := 0
+	for ; i < 10; i++ {
+	  fmt.Println(i)
+	  time.Sleep(1 * time.Second)
+	}
+	*/	
+	//saveFile(path, streamData)
+
+	wait.Wait() //Go루틴 모두 끝날 때까지 대기
 
 	return stream.SendAndClose(&pb.EchoResponse{Message: "1"}) 
 }

@@ -26,6 +26,8 @@ import (
 	"log"
 	"time"
 	"os"
+	"sync"
+	"strconv"
 	//"io/ioutil"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -33,6 +35,7 @@ import (
 	"google.golang.org/grpc/metadata"
 )
 
+var wg sync.WaitGroup
 var addr = flag.String("addr", "localhost:50051", "the address to connect to")
 
 const (
@@ -187,13 +190,15 @@ func clientStreamWithMetadata(c pb.EchoClient, message string) {
 	//	}
 	//}
 	
-	var path string = "/home/icatch/"
-	
+	var path string = "/home/icatch/pcm/"
+	/*
 	if message == "1"{
 		path = path + "file.pcm"
 	} else {
 		path = path + "output.pcm"
 	}
+	*/
+	path = path + message + ".pcm"
 	fi, err := os.Open(path)
 	if err != nil {
 		panic(err)
@@ -329,9 +334,29 @@ func bidirectionalWithMetadata(c pb.EchoClient, message string) {
 
 const message = "this is examples/metadata"
 
+
+func grpcTest(message string) {
+
+	conn, err := grpc.Dial(*addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		log.Fatalf("did not connect: %v", err)
+	}
+	defer conn.Close()
+	//defer wg.Done() 
+	c := pb.NewEchoClient(conn)
+
+	time.Sleep(1 * time.Second)
+	fmt.Printf("grpcTest %s\n", message)
+	clientStreamWithMetadata(c, message)
+
+	
+	//return 
+}
+
 func main() {
 	flag.Parse()
 	// Set up a connection to the server.
+	/*
 	conn, err := grpc.Dial(*addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		log.Fatalf("did not connect: %v", err)
@@ -339,18 +364,27 @@ func main() {
 	defer conn.Close()
 
 	c := pb.NewEchoClient(conn)
-
+	
 //	unaryCallWithMetadata(c, message)
 //	time.Sleep(1 * time.Second)
 
 //	serverStreamingWithMetadata(c, message)
-//	time.Sleep(1 * time.Second)
+	time.Sleep(1 * time.Second)
     firstArg := os.Args[1]
 	clientStreamWithMetadata(c, ""+firstArg)
 //	time.Sleep(1 * time.Second)
-
-	
+	*/
+//    clientStreamWithMetadata(c, ""+firstArg)
 //	clientStreamWithMetadata(c, "ID:1")
 //	clientStreamWithMetadata(c, "ID:2")
 //	bidirectionalWithMetadata(c, message)
+	
+	var wg sync.WaitGroup
+
+	wg.Add(10)
+	for i := 0; i < 10; i++ {
+		go grpcTest(strconv.Itoa(i))
+	}
+	wg.Wait()
+	
 }
