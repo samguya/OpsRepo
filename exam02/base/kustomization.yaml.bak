@@ -1,0 +1,12 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+images:
+- name: example2
+  newName: samguya/example
+  newTag: v1
+
+
+resources:
+- deployment.yaml
+- service.yaml
