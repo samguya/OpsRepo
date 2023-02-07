@@ -37,6 +37,11 @@ import (
 	"google.golang.org/grpc/status"
 
         pb "github.com/samguya/grpclab/proto"
+	"github.com/minio/minio-go/v7"
+	"github.com/minio/minio-go/v7/pkg/credentials"
+	"github.com/Shopify/sarama"
+
+	kafka "github.com/cloudevents/sdk-go/protocol/kafka_sarama/v2"
 )
 
 var port = flag.Int("port", 50051, "the port to serve on")
@@ -320,6 +325,32 @@ func saveFile(path string, data bytes.Buffer){
 }
 
 func main() {
+
+	ctx := context.Background()
+	Config := sarama.NewConfig()
+	Config.Version = sarama.V2_0_0_0
+	strSplitKafkaHost := strings.Split("localhost:9092", ",")
+	p, err := kafka.NewConsumer(strSplitKafkaHost, Config, "test-group", "jhlee-test-topic333")
+	if err != nil {
+		fmt.Printf("failed to create consumer, %v", err)
+		return
+	}
+
+	minioClient, err := minio.New("localhost:9000", &minio.Options{
+		Creds:  credentials.NewStaticV4("admin1234", "admin1234", ""),
+		Secure: false})
+
+	if err != nil {
+		log.Fatalln(err)
+	}
+	buckets, err := minioClient.ListBuckets(context.Background())
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	for _, bucket := range buckets {
+		fmt.Println(bucket)
+	}
 	flag.Parse()
 	rand.Seed(time.Now().UnixNano())
 	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", *port))
