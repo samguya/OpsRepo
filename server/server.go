@@ -325,7 +325,7 @@ func saveFile(path string, data bytes.Buffer){
 }
 
 func main() {
-
+	print
 	ctx := context.Background()
 	Config := sarama.NewConfig()
 	Config.Version = sarama.V2_0_0_0
